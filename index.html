@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大地記事 - 跨平台同步空間</title>
+    <title>大地記事 - Google 帳號同步版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -76,17 +76,32 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCWIB1JBSmMeW2UvTEX80UvRNPq4kkQyj0",
+            authDomain: "note-fb03c.firebaseapp.com",
+            projectId: "note-fb03c",
+            storageBucket: "note-fb03c.firebasestorage.app",
+            messagingSenderId: "834422503254",
+            appId: "1:834422503254:web:5bb6bd988616c67f3a88f7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
         window.FirebaseSDK = {
-            initializeApp, getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, query, serverTimestamp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken
+            app, db, auth, 
+            collection, addDoc, onSnapshot, doc, deleteDoc, query, serverTimestamp, 
+            GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
         };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const Icon = ({ name, size = 20, className = "" }) => {
+        const Icon = ({ name, size = 20, className = "", fill = "none" }) => {
             const icons = {
                 trash: <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />,
                 note: (
@@ -118,7 +133,9 @@
                         <path d="m22 2-7 20-4-9-9-4Z"/>
                         <path d="M22 2 11 13"/>
                     </>
-                )
+                ),
+                logOut: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />,
+                google: <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
             };
 
             return (
@@ -127,7 +144,7 @@
                     width={size}
                     height={size}
                     viewBox="0 0 24 24"
-                    fill="none"
+                    fill={fill}
                     stroke="currentColor"
                     strokeWidth="2"
                     strokeLinecap="round"
@@ -139,10 +156,6 @@
             );
         };
 
-        const { 
-            initializeApp, getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, query, serverTimestamp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken 
-        } = window.FirebaseSDK || {};
-
         function App() {
             const [user, setUser] = useState(null);
             const [inputValue, setInputValue] = useState('');
@@ -151,35 +164,30 @@
             const [selectedImage, setSelectedImage] = useState(null);
             const [isUploading, setIsUploading] = useState(false);
             const [fullscreenImage, setFullscreenImage] = useState(null);
+            const [errorMessage, setErrorMessage] = useState(null);
             
             const fileInputRef = useRef(null);
             const textareaRef = useRef(null);
-            const dbRef = useRef(null);
-            const authRef = useRef(null);
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'notebook-web-id';
+            const appId = 'earth-note-web-app';
 
             useEffect(() => {
-                const initFirebase = async () => {
-                    if (window.FirebaseSDK) {
-                        const firebaseConfig = JSON.parse(__firebase_config);
-                        const app = initializeApp(firebaseConfig);
-                        authRef.current = getAuth(app);
-                        dbRef.current = getFirestore(app);
-
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(authRef.current, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(authRef.current);
-                        }
-                        onAuthStateChanged(authRef.current, setUser);
+                if (!window.FirebaseSDK) return;
+                const { auth, onAuthStateChanged } = window.FirebaseSDK;
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    if (!u) {
+                        setNotes([]);
+                        setLoading(false);
                     }
-                };
-                initFirebase();
+                });
+                return () => unsubscribe();
             }, []);
 
             useEffect(() => {
-                if (!user || !dbRef.current) return;
-                const notesRef = collection(dbRef.current, 'artifacts', appId, 'users', user.uid, 'notes');
+                if (!user || !window.FirebaseSDK) return;
+                setLoading(true);
+                const { db, collection, query, onSnapshot } = window.FirebaseSDK;
+                const notesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'notes');
                 
                 const unsubscribe = onSnapshot(query(notesRef), (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -190,7 +198,10 @@
                     });
                     setNotes(sortedData);
                     setLoading(false);
-                }, (err) => console.error(err));
+                }, (err) => {
+                    console.error("Firestore error:", err);
+                    setLoading(false);
+                });
                 return () => unsubscribe();
             }, [user]);
 
@@ -202,9 +213,32 @@
                 }
             }, [inputValue]);
 
+            const handleGoogleSignIn = async () => {
+                setErrorMessage(null);
+                const { auth, GoogleAuthProvider, signInWithPopup } = window.FirebaseSDK;
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Login Failed:", error);
+                    if (error.code === 'auth/unauthorized-domain') {
+                        setErrorMessage("目前的網域未經 Firebase 授權。請將此網域加入 Firebase Console 的『授權網域』清單中。");
+                    } else {
+                        setErrorMessage("登入失敗：" + error.message);
+                    }
+                }
+            };
+
+            const handleSignOut = () => {
+                const { auth, signOut } = window.FirebaseSDK;
+                signOut(auth);
+            };
+
             const handleAddNote = async () => {
                 if ((!inputValue.trim() && !selectedImage) || !user) return;
                 setIsUploading(true);
+                const { db, collection, addDoc, serverTimestamp } = window.FirebaseSDK;
+
                 const dateResult = (text) => {
                     const regexes = [/(\d{4})年(\d{1,2})月(\d{1,2})日/, /(\d{1,2})月(\d{1,2})日/, /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/, /(\d{1,2}[\/\-]\d{1,2})/];
                     for (let r of regexes) { const m = text.match(r); if (m) return m[0]; }
@@ -215,7 +249,7 @@
                 const finalContent = targetDate ? inputValue.replace(targetDate, '').trim() : inputValue;
 
                 try {
-                    await addDoc(collection(dbRef.current, 'artifacts', appId, 'users', user.uid, 'notes'), {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), {
                         content: finalContent || (selectedImage ? "" : targetDate),
                         createdAt: serverTimestamp(),
                         imageUrl: selectedImage,
@@ -233,7 +267,6 @@
                 const parts = text.split(urlRegex);
                 return parts.map((part, i) => {
                     if (part && part.match(urlRegex)) {
-                        if (/^\d+(\.\d+)+$/.test(part)) return part;
                         const href = part.toLowerCase().startsWith('http') ? part : `https://${part}`;
                         return <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-[#8b4513] hover:text-[#3d1f0a] underline decoration-[#8b4513]/40 font-bold transition-all break-all inline-block">{part}</a>;
                     }
@@ -241,38 +274,94 @@
                 });
             };
 
-            // 保持原本的分流邏輯，但這裡傳遞的是原始索引 index
-            const leftNotes = notes.map((note, originalIndex) => ({ ...note, originalIndex })).filter((_, i) => i % 2 === 0);
-            const rightNotes = notes.map((note, originalIndex) => ({ ...note, originalIndex })).filter((_, i) => i % 2 !== 0);
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#f5ebe0]">
+                        <div className="bg-white p-10 rounded-[40px] shadow-2xl text-center max-w-sm w-full border border-[#e3d5ca]">
+                            <div className="w-20 h-20 bg-[#fdfaf6] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <Icon name="note" size={40} className="text-[#99582a]" />
+                            </div>
+                            <h1 className="text-3xl font-black text-[#432818] mb-2">大地記事</h1>
+                            <p className="text-[#99582a]/60 font-medium mb-10">跨平台、多裝置即時同步</p>
+                            
+                            {errorMessage && (
+                                <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm rounded-2xl border border-red-100 font-medium leading-relaxed">
+                                    {errorMessage}
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={handleGoogleSignIn}
+                                className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#432818] text-white rounded-2xl font-bold hover:bg-[#3d1f0a] active:scale-95 transition-all shadow-lg"
+                            >
+                                <Icon name="google" size={20} fill="white" />
+                                使用 Google 帳號登入
+                            </button>
+                            <p className="mt-8 text-[12px] text-[#99582a]/40 leading-relaxed font-medium">
+                                登入即代表您同意將資料儲存於雲端<br/>以便在手機、平板與電腦同步
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const leftNotes = notes.map((n, i) => ({...n, originalIndex: i})).filter((_, i) => i % 2 === 0);
+            const rightNotes = notes.map((n, i) => ({...n, originalIndex: i})).filter((_, i) => i % 2 !== 0);
 
             return (
                 <div className="flex flex-col md:flex-row min-h-screen">
-                    <aside className="hidden md:flex w-64 wood-texture bg-[#432818] text-[#f5ebe0] flex-col p-6 fixed h-full shadow-2xl z-20">
-                        <div className="mb-10"><h1 className="text-2xl font-black mb-1 flex items-center gap-3"><Icon name="note" size={24} className="text-[#bb9457]" /> 大地記事</h1></div>
-                        <nav className="flex-grow space-y-2">
-                            <div className="flex items-center gap-3 p-3 bg-white/10 rounded-xl border border-white/5 cursor-default">
-                                <Icon name="note" size={18} /><span className="font-bold text-sm">所有記事</span>
-                                <span className="ml-auto bg-[#bb9457] text-[#432818] px-2 py-0.5 rounded-full text-[10px] font-black">{notes.length}</span>
+                    <aside className="hidden md:flex w-72 wood-texture bg-[#432818] text-[#f5ebe0] flex-col p-8 fixed h-full shadow-2xl z-20">
+                        <div className="mb-12">
+                            <h1 className="text-2xl font-black mb-1 flex items-center gap-3">
+                                <Icon name="note" size={26} className="text-[#bb9457]" /> 大地記事
+                            </h1>
+                        </div>
+                        
+                        <div className="flex-grow space-y-3">
+                            <div className="flex items-center gap-3 p-4 bg-white/10 rounded-2xl border border-white/5 cursor-default group transition-all">
+                                <Icon name="note" size={18} className="text-[#bb9457]" />
+                                <span className="font-bold text-sm">所有記事</span>
+                                <span className="ml-auto bg-[#bb9457] text-[#432818] px-2.5 py-0.5 rounded-full text-[10px] font-black">{notes.length}</span>
                             </div>
-                        </nav>
-                        <div className="mt-auto pt-4 border-t border-white/5 text-[10px] opacity-30 font-bold truncate">ID: {user?.uid}</div>
+                        </div>
+
+                        <div className="mt-auto space-y-4">
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
+                                <img src={user.photoURL} className="w-10 h-10 rounded-xl shadow-md border-2 border-[#bb9457]/30" />
+                                <div className="flex-1 overflow-hidden">
+                                    <div className="font-bold text-sm truncate">{user.displayName}</div>
+                                    <div className="text-[10px] opacity-40 font-bold truncate">已同步雲端</div>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleSignOut}
+                                className="w-full flex items-center justify-center gap-2 p-3 text-sm font-bold text-[#bb9457] hover:bg-white/5 rounded-xl transition-all"
+                            >
+                                <Icon name="logOut" size={16} /> 登出帳號
+                            </button>
+                        </div>
                     </aside>
 
-                    <main className="flex-1 md:ml-64 p-4 md:p-8 lg:p-10 bg-[#f5ebe0]">
-                        <header className="md:hidden flex items-center justify-between mb-6">
-                            <h1 className="text-xl font-black text-[#432818] flex items-center gap-2"><Icon name="note" size={22} className="text-[#99582a]" /> 大地記事</h1>
+                    <main className="flex-1 md:ml-72 p-4 md:p-10 lg:p-14 bg-[#f5ebe0]">
+                        <header className="md:hidden flex items-center justify-between mb-8">
+                            <h1 className="text-2xl font-black text-[#432818] flex items-center gap-2">
+                                <Icon name="note" size={24} className="text-[#99582a]" /> 大地記事
+                            </h1>
+                            <button onClick={handleSignOut} className="p-2 text-[#99582a] bg-white rounded-full shadow-sm">
+                                <Icon name="logOut" size={20} />
+                            </button>
                         </header>
 
-                        <section className="max-w-3xl mx-auto mb-12 sticky top-4 z-10">
-                            <div className="bg-white rounded-[28px] card-shadow border border-[#e3d5ca] overflow-hidden focus-within:ring-4 focus-within:ring-[#99582a]/10 transition-all">
+                        <section className="max-w-3xl mx-auto mb-16 sticky top-4 z-10">
+                            <div className="bg-white rounded-[32px] card-shadow border border-[#e3d5ca] overflow-hidden focus-within:ring-4 focus-within:ring-[#99582a]/10 transition-all">
                                 {selectedImage && (
-                                    <div className="p-4 bg-[#fdfaf6] border-b border-[#f5ebe0] relative flex justify-center">
-                                        <img src={selectedImage} className="max-h-56 rounded-lg shadow-sm" />
-                                        <button onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 p-1.5 bg-[#432818] text-white rounded-full"><Icon name="x" size={14} /></button>
+                                    <div className="p-6 bg-[#fdfaf6] border-b border-[#f5ebe0] relative flex justify-center group">
+                                        <img src={selectedImage} className="max-h-64 rounded-xl shadow-lg" />
+                                        <button onClick={() => setSelectedImage(null)} className="absolute top-8 right-8 p-2 bg-[#432818] text-white rounded-full shadow-xl active:scale-90 transition-transform"><Icon name="x" size={16} /></button>
                                     </div>
                                 )}
-                                <div className="flex items-end p-3 gap-3">
-                                    <button onClick={() => fileInputRef.current.click()} className="p-3 text-[#99582a] hover:bg-[#99582a]/10 rounded-full transition-all"><Icon name="image" size={24} /></button>
+                                <div className="flex items-end p-4 gap-4">
+                                    <button onClick={() => fileInputRef.current.click()} className="p-4 text-[#99582a] hover:bg-[#99582a]/10 rounded-2xl transition-all active:scale-90"><Icon name="image" size={26} /></button>
                                     <input type="file" ref={fileInputRef} onChange={(e) => {
                                         const file = e.target.files[0];
                                         if (file) {
@@ -283,70 +372,69 @@
                                     }} className="hidden" accept="image/*" />
                                     <textarea ref={textareaRef} rows="1" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !('ontouchstart' in window) && !e.shiftKey) { e.preventDefault(); handleAddNote(); }
-                                    }} placeholder="輸入內容..." className="flex-1 bg-transparent border-none py-3 text-lg font-medium text-[#432818] placeholder-[#d5bdaf] focus:outline-none resize-none no-scrollbar" />
-                                    <button onClick={handleAddNote} disabled={isUploading || (!inputValue.trim() && !selectedImage)} className="p-3.5 bg-[#432818] text-[#f5ebe0] rounded-full shadow-md active:scale-95 disabled:opacity-20 transition-all shrink-0">
-                                        {isUploading ? <Icon name="loader" size={24} className="animate-spin" /> : <Icon name="send" size={24} />}
+                                    }} placeholder="記錄今日大地之事..." className="flex-1 bg-transparent border-none py-4 text-xl font-medium text-[#432818] placeholder-[#d5bdaf] focus:outline-none resize-none no-scrollbar" />
+                                    <button onClick={handleAddNote} disabled={isUploading || (!inputValue.trim() && !selectedImage)} className="p-5 bg-[#432818] text-[#f5ebe0] rounded-2xl shadow-xl active:scale-95 disabled:opacity-20 transition-all shrink-0">
+                                        {isUploading ? <Icon name="loader" size={26} className="animate-spin" /> : <Icon name="send" size={26} />}
                                     </button>
                                 </div>
                             </div>
                         </section>
 
-                        <section className="max-w-5xl mx-auto">
+                        <section className="max-w-6xl mx-auto">
                             {loading ? (
-                                <div className="flex justify-center py-20"><Icon name="loader" size={28} className="animate-spin text-[#99582a]" /></div>
-                            ) : (
-                                <div className="flex flex-col force-2col:flex-row gap-8 items-start">
-                                    <div className="flex-1 flex flex-col gap-8 w-full">
-                                        {leftNotes.map((note) => (
-                                            <NoteCard key={note.id} note={note} index={note.originalIndex} user={user} dbRef={dbRef} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
-                                        ))}
-                                    </div>
-                                    <div className="flex-1 flex flex-col gap-8 w-full">
-                                        {rightNotes.map((note) => (
-                                            <NoteCard key={note.id} note={note} index={note.originalIndex} user={user} dbRef={dbRef} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
-                                        ))}
-                                    </div>
+                                <div className="flex justify-center py-24"><Icon name="loader" size={32} className="animate-spin text-[#99582a]" /></div>
+                            ) : notes.length === 0 ? (
+                                <div className="text-center py-24">
+                                    <Icon name="note" size={48} className="mx-auto text-[#d5bdaf] mb-4 opacity-20" />
+                                    <p className="text-[#99582a]/40 font-bold">目前還沒有任何記事</p>
                                 </div>
-                            )}
-                            {!loading && notes.length === 0 && (
-                                <div className="text-center py-32 border-2 border-dashed border-[#d5bdaf] rounded-[40px] opacity-40">
-                                    <Icon name="plus" size={48} className="mx-auto mb-4 text-[#99582a]" />
-                                    <p className="font-bold text-[#99582a] text-lg">開始記錄您的第一筆大地記事吧</p>
+                            ) : (
+                                <div className="flex flex-col force-2col:flex-row gap-10 items-start">
+                                    <div className="flex-1 flex flex-col gap-10 w-full">
+                                        {leftNotes.map((note) => (
+                                            <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
+                                        ))}
+                                    </div>
+                                    <div className="flex-1 flex flex-col gap-10 w-full">
+                                        {rightNotes.map((note) => (
+                                            <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </section>
                     </main>
 
                     {fullscreenImage && (
-                        <div className="fixed inset-0 z-[100] bg-[#432818]/95 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setFullscreenImage(null)}>
-                            <img src={fullscreenImage} className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl animate-fade-in" />
+                        <div className="fixed inset-0 z-[100] bg-[#432818]/95 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setFullscreenImage(null)}>
+                            <img src={fullscreenImage} className="max-w-full max-h-[92vh] object-contain rounded-2xl shadow-2xl animate-fade-in" />
                         </div>
                     )}
                 </div>
             );
         }
 
-        function NoteCard({ note, index, user, dbRef, appId, renderContent, fullscreenImage }) {
-            // 邏輯：每兩個一組切換顏色 (0,1 -> 綠色; 2,3 -> 黃色; 4,5 -> 綠色...)
-            const isGreenGroup = Math.floor(index / 2) % 2 === 0;
-            
+        function NoteCard({ note, user, appId, renderContent, fullscreenImage }) {
+            const isGreenGroup = Math.floor(note.originalIndex / 2) % 2 === 0;
+            const { db, doc, deleteDoc } = window.FirebaseSDK;
+
             return (
-                <article className={`note-card rounded-[32px] p-8 card-shadow relative animate-fade-in group border transition-all duration-500 ${isGreenGroup ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffef2] border-[#f0f2d8]'}`}>
-                    <button onClick={() => deleteDoc(doc(dbRef.current, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
-                            className="absolute top-5 right-5 text-[#d5bdaf] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-2.5 hover:bg-white rounded-full z-10">
-                        <Icon name="trash" size={16} />
+                <article className={`note-card rounded-[40px] p-10 card-shadow relative animate-fade-in group border transition-all duration-700 ${isGreenGroup ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffef2] border-[#f0f2d8]'}`}>
+                    <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
+                            className="absolute top-6 right-6 text-[#d5bdaf] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-3 hover:bg-white rounded-full z-10 shadow-sm">
+                        <Icon name="trash" size={18} />
                     </button>
                     {note.targetDate && (
-                        <div className="flex items-center gap-2 text-[12px] font-bold text-[#99582a] mb-4 bg-[#99582a]/5 w-fit px-3 py-1.5 rounded-full border border-[#99582a]/10">
-                            <Icon name="calendar" size={14} /> {note.targetDate}
+                        <div className="flex items-center gap-2 text-[13px] font-black text-[#99582a] mb-6 bg-[#99582a]/5 w-fit px-4 py-2 rounded-full border border-[#99582a]/10">
+                            <Icon name="calendar" size={16} /> {note.targetDate}
                         </div>
                     )}
                     {note.imageUrl && (
-                        <div className="relative mb-6 cursor-zoom-in overflow-hidden rounded-[20px] shadow-sm bg-black/5" onClick={() => fullscreenImage(note.imageUrl)}>
-                            <img src={note.imageUrl} className="w-full h-auto max-h-[400px] object-cover hover:scale-105 transition-transform duration-500" />
+                        <div className="relative mb-8 cursor-zoom-in overflow-hidden rounded-[28px] shadow-md bg-black/5" onClick={() => fullscreenImage(note.imageUrl)}>
+                            <img src={note.imageUrl} className="w-full h-auto max-h-[450px] object-cover hover:scale-105 transition-transform duration-700" />
                         </div>
                     )}
-                    <div className="text-[#432818] text-lg md:text-xl font-medium leading-relaxed whitespace-pre-wrap break-words">
+                    <div className="text-[#432818] text-xl md:text-2xl font-medium leading-relaxed whitespace-pre-wrap break-words">
                         {renderContent(note.content)}
                     </div>
                 </article>
