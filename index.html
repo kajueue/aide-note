@@ -273,7 +273,6 @@
                 return parts.map((part, i) => {
                     if (part && part.match(urlRegex)) {
                         const href = part.toLowerCase().startsWith('http') ? part : `https://${part}`;
-                        // 超連結字體固定為 14px，維持原本加粗與下劃線
                         return <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-[#8b4513] hover:text-[#3d1f0a] underline decoration-[#8b4513]/40 font-bold break-all text-[14px] inline-block">{part}</a>;
                     }
                     return part;
@@ -298,6 +297,7 @@
                 );
             }
 
+            // 計算左右欄位
             const leftNotes = notes.filter((_, i) => i % 2 === 0);
             const rightNotes = notes.filter((_, i) => i % 2 !== 0);
 
@@ -382,20 +382,20 @@
                                 <>
                                     {/* 手機單欄 */}
                                     <div className="flex flex-col gap-5 md:hidden">
-                                        {notes.map((note) => (
-                                            <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
+                                        {notes.map((note, index) => (
+                                            <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={index} />
                                         ))}
                                     </div>
                                     {/* 電腦兩欄 */}
                                     <div className="hidden md:flex gap-6 items-start">
                                         <div className="flex-1 flex flex-col gap-6">
-                                            {leftNotes.map((note) => (
-                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
+                                            {leftNotes.map((note, idx) => (
+                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={idx * 2} />
                                             ))}
                                         </div>
                                         <div className="flex-1 flex flex-col gap-6">
-                                            {rightNotes.map((note) => (
-                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} />
+                                            {rightNotes.map((note, idx) => (
+                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={idx * 2 + 1} />
                                             ))}
                                         </div>
                                     </div>
@@ -414,11 +414,15 @@
             );
         }
 
-        function NoteCard({ note, user, appId, renderContent, fullscreenImage }) {
+        function NoteCard({ note, user, appId, renderContent, fullscreenImage, index }) {
             const { db, doc, deleteDoc } = window.FirebaseSDK;
+            
+            // 根據索引計算底色與邊框色
+            const isEvenRow = Math.floor(index / 2) % 2 === 0;
+            const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fefae0] border-[#e9edc9]';
 
             return (
-                <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border bg-white border-[#e9efe0]`}>
+                <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border ${bgClass}`}>
                     <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
                             className="absolute top-3 right-3 text-[#d5bdaf] hover:text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all p-1.5 hover:bg-white rounded-full z-10">
                         <Icon name="trash" size={14} />
