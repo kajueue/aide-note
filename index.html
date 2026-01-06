@@ -419,7 +419,8 @@
             
             // 根據索引計算底色與邊框色
             const isEvenRow = Math.floor(index / 2) % 2 === 0;
-            const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fefae0] border-[#e9edc9]';
+            // 調整黃色為更淡的顏色 (#fffdf0) 並同步優化邊框色
+            const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
 
             return (
                 <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border ${bgClass}`}>
