@@ -37,10 +37,14 @@
             background-color: var(--earth-bg);
             color: var(--earth-dark);
             overflow-x: hidden;
-            /* 禁止手機上下拉動時的彈簧效果，避免視覺縮放感 */
+            /* 禁止手機上下拉動時的彈簧效果 */
             overscroll-behavior: none;
             /* 雙指縮放禁用 */
             touch-action: pan-x pan-y;
+            /* 改善電腦版字體模糊問題，強制平滑渲染 */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         .wood-texture {
@@ -269,7 +273,8 @@
                 return parts.map((part, i) => {
                     if (part && part.match(urlRegex)) {
                         const href = part.toLowerCase().startsWith('http') ? part : `https://${part}`;
-                        return <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-[#8b4513] hover:text-[#3d1f0a] underline decoration-[#8b4513]/40 font-bold break-all">{part}</a>;
+                        // 超連結字體固定為 14px，維持原本加粗與下劃線
+                        return <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-[#8b4513] hover:text-[#3d1f0a] underline decoration-[#8b4513]/40 font-bold break-all text-[14px] inline-block">{part}</a>;
                     }
                     return part;
                 });
@@ -428,7 +433,6 @@
                             <img src={note.imageUrl} className="w-full h-auto max-h-[350px] object-cover" />
                         </div>
                     )}
-                    {/* 微調字體大小為 17px，增強閱讀感 */}
                     <div className="text-[#432818] text-[17px] font-medium leading-relaxed whitespace-pre-wrap break-words">
                         {renderContent(note.content)}
                     </div>
