@@ -2,10 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <!-- 嚴格鎖定縮放，禁止手指撥動放大 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
     <title>大地記事 - 雲端同步版</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -18,7 +16,6 @@
             }
         }
     </script>
-    <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -37,11 +34,8 @@
             background-color: var(--earth-bg);
             color: var(--earth-dark);
             overflow-x: hidden;
-            /* 禁止手機上下拉動時的彈簧效果 */
             overscroll-behavior: none;
-            /* 雙指縮放禁用 */
             touch-action: pan-x pan-y;
-            /* 改善電腦版字體模糊問題，強制平滑渲染 */
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
@@ -74,7 +68,6 @@
             display: none;
         }
 
-        /* 確保輸入框字體足夠大，防止系統自動縮放 */
         textarea, input {
             font-size: 16px !important;
         }
@@ -200,7 +193,6 @@
                 
                 const unsubscribe = onSnapshot(query(notesRef), (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // 維持最新排序在最上
                     const sortedData = data.sort((a, b) => {
                         const timeA = a.createdAt?.toMillis() || Date.now();
                         const timeB = b.createdAt?.toMillis() || Date.now();
@@ -244,20 +236,27 @@
                 setIsUploading(true);
                 const { db, collection, addDoc, serverTimestamp } = window.FirebaseSDK;
 
-                // 更新日期提取邏輯，支援區段識別 (例如 1/5-1/6)
-                const dateResult = (text) => {
-                    // 基礎日期模式：支援 YYYY/MM/DD, MM/DD, YYYY年MM月DD日, MM月DD日
-                    const datePattern = /(\d{4}[\/\-年])?(\d{1,2}[\/\-月])(\d{1,2})日?/;
-                    // 區段符號模式
-                    const rangeSeparator = /[\-\~\至\到\s]+/;
-                    // 建立區段正則表達式 (日期 + 分隔符 + 日期) 或 單一日期
-                    const rangeRegex = new RegExp(`(${datePattern.source})${rangeSeparator.source}(${datePattern.source})|(${datePattern.source})`);
+                // 強化版日期提取邏輯：支援省略月份的區段辨識 (例如：2026年1月3日至17日)
+                const extractDateRange = (text) => {
+                    // 基礎日期格式
+                    const baseDate = /(\d{4}[\/\-年])?(\d{1,2}[\/\-月])(\d{1,2})日?/;
+                    // 省略了月份的日期格式 (僅有數字與日)
+                    const shortDate = /(\d{1,2})日?/;
+                    // 區段連接符
+                    const connector = /[\-\~\～\—\至\到\s]+/;
+                    
+                    // 組合正則：優先抓取完整或省略月份的區段，最後才抓單一日期
+                    const rangeRegex = new RegExp(
+                        `(${baseDate.source})${connector.source}(${baseDate.source})` + // 完整區段
+                        `|(${baseDate.source})${connector.source}(${shortDate.source})` + // 省略月份區段
+                        `|(${baseDate.source})` // 單一日期
+                    );
                     
                     const match = text.match(rangeRegex);
                     return match ? match[0] : null;
                 };
 
-                const targetDate = dateResult(inputValue);
+                const targetDate = extractDateRange(inputValue);
                 const finalContent = targetDate ? inputValue.replace(targetDate, '').trim() : inputValue;
 
                 try {
@@ -304,13 +303,11 @@
                 );
             }
 
-            // 計算左右欄位
             const leftNotes = notes.filter((_, i) => i % 2 === 0);
             const rightNotes = notes.filter((_, i) => i % 2 !== 0);
 
             return (
                 <div className="flex flex-col md:flex-row min-h-screen">
-                    {/* Desktop Sidebar */}
                     <aside className="hidden md:flex w-60 wood-texture bg-[#432818] text-[#f5ebe0] flex-col p-5 fixed h-full shadow-2xl z-20">
                         <div className="mb-8">
                             <h1 className="text-lg font-black flex items-center gap-2">
@@ -339,7 +336,6 @@
                     </aside>
 
                     <main className="flex-1 md:ml-60 p-4 md:p-6 lg:p-10 bg-[#f5ebe0]">
-                        {/* Mobile Header */}
                         <header className="md:hidden flex items-center justify-between mb-5 px-1">
                             <h1 className="text-lg font-black text-[#432818] flex items-center gap-2">
                                 <Icon name="note" size={18} className="text-[#99582a]" /> 大地記事
@@ -352,7 +348,6 @@
                             </div>
                         </header>
 
-                        {/* Input Section */}
                         <section className="max-w-xl mx-auto mb-6 md:mb-10 sticky top-2 z-10">
                             <div className="bg-white/95 backdrop-blur-md rounded-[20px] card-shadow border border-[#e3d5ca] overflow-hidden focus-within:ring-2 focus-within:ring-[#99582a]/10 transition-all px-1.5 py-0.5">
                                 {selectedImage && (
@@ -381,19 +376,16 @@
                             </div>
                         </section>
 
-                        {/* List Section */}
                         <section className="max-w-4xl mx-auto">
                             {loading ? (
                                 <div className="flex justify-center py-10"><Icon name="loader" size={20} className="animate-spin text-[#99582a]" /></div>
                             ) : (
                                 <>
-                                    {/* 手機單欄 */}
                                     <div className="flex flex-col gap-5 md:hidden">
                                         {notes.map((note, index) => (
                                             <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={index} />
                                         ))}
                                     </div>
-                                    {/* 電腦兩欄 */}
                                     <div className="hidden md:flex gap-6 items-start">
                                         <div className="flex-1 flex flex-col gap-6">
                                             {leftNotes.map((note, idx) => (
@@ -411,7 +403,6 @@
                         </section>
                     </main>
 
-                    {/* Image Overlay */}
                     {fullscreenImage && (
                         <div className="fixed inset-0 z-[100] bg-[#432818]/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setFullscreenImage(null)}>
                             <img src={fullscreenImage} className="max-w-full max-h-[85vh] object-contain rounded shadow-2xl animate-fade-in" />
@@ -423,10 +414,7 @@
 
         function NoteCard({ note, user, appId, renderContent, fullscreenImage, index }) {
             const { db, doc, deleteDoc } = window.FirebaseSDK;
-            
-            // 根據索引計算底色與邊框色
             const isEvenRow = Math.floor(index / 2) % 2 === 0;
-            // 調整黃色為更淡的顏色 (#fffdf0) 並同步優化邊框色
             const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
 
             return (
