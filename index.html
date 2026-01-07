@@ -236,24 +236,33 @@
                 setIsUploading(true);
                 const { db, collection, addDoc, serverTimestamp } = window.FirebaseSDK;
 
-                // 強化版日期提取邏輯：支援省略月份的區段辨識 (例如：2026年1月3日至17日)
+                /**
+                 * 強化版日期提取邏輯
+                 * 支援: 1/24-30, 1月24日-30日, 2026/1/24~30
+                 */
                 const extractDateRange = (text) => {
-                    // 基礎日期格式
-                    const baseDate = /(\d{4}[\/\-年])?(\d{1,2}[\/\-月])(\d{1,2})日?/;
-                    // 省略了月份的日期格式 (僅有數字與日)
-                    const shortDate = /(\d{1,2})日?/;
-                    // 區段連接符
-                    const connector = /[\-\~\～\—\至\到\s]+/;
+                    // 年份 (選填)
+                    const yearPart = "(?:\\d{4}[\\/\\-年])?";
+                    // 月份 (必填) + 日期 (必填)
+                    const monthDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?)";
+                    // 連接符
+                    const connector = "[\\-\\~\\～\\—\\至\\到\\s]+";
+                    // 後端的日期 (可以是 1/25 或 25 或 25日)
+                    const trailingDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?|\\d{1,2}日?)";
                     
-                    // 組合正則：優先抓取完整或省略月份的區段，最後才抓單一日期
-                    const rangeRegex = new RegExp(
-                        `(${baseDate.source})${connector.source}(${baseDate.source})` + // 完整區段
-                        `|(${baseDate.source})${connector.source}(${shortDate.source})` + // 省略月份區段
-                        `|(${baseDate.source})` // 單一日期
-                    );
+                    // 組合邏輯
+                    // 1. 完整區段: 月/日-月/日 或 月/日-日
+                    const fullRangeRegex = new RegExp(`${yearPart}${monthDayPart}${connector}${trailingDayPart}`, "i");
+                    // 2. 單一日期
+                    const singleDateRegex = new RegExp(`${yearPart}${monthDayPart}`, "i");
                     
-                    const match = text.match(rangeRegex);
-                    return match ? match[0] : null;
+                    const rangeMatch = text.match(fullRangeRegex);
+                    if (rangeMatch) return rangeMatch[0];
+                    
+                    const singleMatch = text.match(singleDateRegex);
+                    if (singleMatch) return singleMatch[0];
+                    
+                    return null;
                 };
 
                 const targetDate = extractDateRange(inputValue);
