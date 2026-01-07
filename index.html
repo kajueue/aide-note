@@ -244,10 +244,17 @@
                 setIsUploading(true);
                 const { db, collection, addDoc, serverTimestamp } = window.FirebaseSDK;
 
+                // 更新日期提取邏輯，支援區段識別 (例如 1/5-1/6)
                 const dateResult = (text) => {
-                    const regexes = [/(\d{4})年(\d{1,2})月(\d{1,2})日/, /(\d{1,2})月(\d{1,2})日/, /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/, /(\d{1,2}[\/\-]\d{1,2})/];
-                    for (let r of regexes) { const m = text.match(r); if (m) return m[0]; }
-                    return null;
+                    // 基礎日期模式：支援 YYYY/MM/DD, MM/DD, YYYY年MM月DD日, MM月DD日
+                    const datePattern = /(\d{4}[\/\-年])?(\d{1,2}[\/\-月])(\d{1,2})日?/;
+                    // 區段符號模式
+                    const rangeSeparator = /[\-\~\至\到\s]+/;
+                    // 建立區段正則表達式 (日期 + 分隔符 + 日期) 或 單一日期
+                    const rangeRegex = new RegExp(`(${datePattern.source})${rangeSeparator.source}(${datePattern.source})|(${datePattern.source})`);
+                    
+                    const match = text.match(rangeRegex);
+                    return match ? match[0] : null;
                 };
 
                 const targetDate = dateResult(inputValue);
