@@ -231,9 +231,6 @@
                 signOut(auth);
             };
 
-            /**
-             * 處理貼上事件，識別剪貼簿中的圖片
-             */
             const handlePaste = (e) => {
                 const items = e.clipboardData.items;
                 for (let i = 0; i < items.length; i++) {
@@ -244,8 +241,6 @@
                             setSelectedImage(reader.result);
                         };
                         reader.readAsDataURL(blob);
-                        // 如果貼上的是圖片，可以選擇是否要阻斷文字貼上
-                        // e.preventDefault(); 
                     }
                 }
             };
@@ -392,7 +387,6 @@
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !('ontouchstart' in window) && !e.shiftKey) { e.preventDefault(); handleAddNote(); }
                                         }} 
-                                        placeholder="在此記錄靈感 (支援貼上圖片)..." 
                                         className="flex-1 bg-transparent border-none py-2.5 text-[16px] font-medium text-[#432818] placeholder-[#d5bdaf] focus:outline-none resize-none no-scrollbar" 
                                     />
                                     <button onClick={handleAddNote} disabled={isUploading || (!inputValue.trim() && !selectedImage)} className="p-2.5 bg-[#432818] text-[#f5ebe0] rounded-lg shadow-md active:scale-95 disabled:opacity-20 transition-all shrink-0 m-1">
