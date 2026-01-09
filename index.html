@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>大地記事 - 智慧插入排序版</title>
+    <title>大地記事 - 智慧排序簡潔版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -37,7 +37,6 @@
             overscroll-behavior: none;
             touch-action: pan-x pan-y;
             -webkit-font-smoothing: antialiased;
-            text-rendering: optimizeLegibility;
         }
 
         .wood-texture {
@@ -125,11 +124,8 @@
             return null;
         };
 
-        /**
-         * 智慧插入邏輯演算法
-         */
         const sortNotesSmartly = (data) => {
-            // 1. 先按新增時間 (createdAt) 從新到舊基礎排序
+            // 1. 基礎排序：新增時間由新到舊
             const sortedByCreated = [...data].sort((a, b) => {
                 const timeA = a.createdAt?.toMillis() || Date.now();
                 const timeB = b.createdAt?.toMillis() || Date.now();
@@ -139,22 +135,19 @@
             const result = [];
             const handledIds = new Set();
 
-            // 2. 遍歷基礎排序，處理「磁吸效應」
             sortedByCreated.forEach(note => {
                 if (handledIds.has(note.id)) return;
 
-                // 如果這則筆記有日期，嘗試尋找已在結果清單中是否有相同日期的筆記
                 if (note.targetDate) {
+                    // 2. 磁吸效應：如果已有相同日期的筆記，插在它後面
                     const targetIdx = result.findIndex(r => r.targetDate === note.targetDate);
                     if (targetIdx !== -1) {
-                        // 找到相同日期，插入到該日期筆記的後方 (實現 A B E 效果)
                         result.splice(targetIdx + 1, 0, note);
                     } else {
-                        // 沒衝突，直接放進結果
                         result.push(note);
                     }
                 } else {
-                    // 無日期筆記，直接按新增順序放入
+                    // 3. 無日期者維持基礎順序（置頂）
                     result.push(note);
                 }
                 handledIds.add(note.id);
@@ -249,11 +242,7 @@
                 
                 const unsubscribe = onSnapshot(query(notesRef), (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
-                    // 應用智慧插入排序邏輯
-                    const sortedData = sortNotesSmartly(data);
-                    
-                    setNotes(sortedData);
+                    setNotes(sortNotesSmartly(data));
                     setLoading(false);
                 }, (err) => { setLoading(false); });
                 return () => unsubscribe();
@@ -341,7 +330,6 @@
                 );
             }
 
-            // 保持原本的左右分欄顯示方式
             const leftNotes = notes.filter((_, i) => i % 2 === 0);
             const rightNotes = notes.filter((_, i) => i % 2 !== 0);
 
@@ -355,12 +343,9 @@
                         </div>
                         <div className="flex-grow">
                             <div className="flex items-center gap-2.5 p-2.5 bg-white/10 rounded-lg text-xs font-bold">
-                                <Icon name="note" size={14} className="text-[#bb9457]" /> 智慧磁吸流
+                                <Icon name="note" size={14} className="text-[#bb9457]" /> 智慧插入模式
                                 <span className="ml-auto bg-[#bb9457] text-[#432818] px-1.5 py-0.5 rounded-full text-[9px]">{notes.length}</span>
                             </div>
-                            <p className="mt-4 px-2 text-[10px] opacity-40 leading-relaxed">
-                                新筆記預設置頂，但若偵測到重複日期，則會自動插入至該日期事件後方。
-                            </p>
                         </div>
                         <div className="mt-auto space-y-2">
                             <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
@@ -521,12 +506,6 @@
                         >
                             <Icon name="calendar" size={12} /> {note.targetDate}
                         </button>
-                    )}
-
-                    {!note.targetDate && !isEditing && (
-                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#99582a]/40 mb-3 uppercase tracking-wider">
-                            <Icon name="note" size={10} /> Memo
-                        </div>
                     )}
 
                     {note.imageUrl && (
