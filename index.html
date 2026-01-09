@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>大地記事 - 雲端同步版</title>
+    <title>大地記事 - 智慧插入排序版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -37,7 +37,6 @@
             overscroll-behavior: none;
             touch-action: pan-x pan-y;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
         }
 
@@ -108,7 +107,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Date extraction logic
         const extractDateRange = (text) => {
             const yearPart = "(?:\\d{4}[\\/\\-年])?";
             const monthDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?)";
@@ -125,6 +123,44 @@
             if (singleMatch) return singleMatch[0];
             
             return null;
+        };
+
+        /**
+         * 智慧插入邏輯演算法
+         */
+        const sortNotesSmartly = (data) => {
+            // 1. 先按新增時間 (createdAt) 從新到舊基礎排序
+            const sortedByCreated = [...data].sort((a, b) => {
+                const timeA = a.createdAt?.toMillis() || Date.now();
+                const timeB = b.createdAt?.toMillis() || Date.now();
+                return timeB - timeA;
+            });
+
+            const result = [];
+            const handledIds = new Set();
+
+            // 2. 遍歷基礎排序，處理「磁吸效應」
+            sortedByCreated.forEach(note => {
+                if (handledIds.has(note.id)) return;
+
+                // 如果這則筆記有日期，嘗試尋找已在結果清單中是否有相同日期的筆記
+                if (note.targetDate) {
+                    const targetIdx = result.findIndex(r => r.targetDate === note.targetDate);
+                    if (targetIdx !== -1) {
+                        // 找到相同日期，插入到該日期筆記的後方 (實現 A B E 效果)
+                        result.splice(targetIdx + 1, 0, note);
+                    } else {
+                        // 沒衝突，直接放進結果
+                        result.push(note);
+                    }
+                } else {
+                    // 無日期筆記，直接按新增順序放入
+                    result.push(note);
+                }
+                handledIds.add(note.id);
+            });
+
+            return result;
         };
 
         const Icon = ({ name, size = 18, className = "", fill = "none" }) => {
@@ -213,11 +249,10 @@
                 
                 const unsubscribe = onSnapshot(query(notesRef), (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    const sortedData = data.sort((a, b) => {
-                        const timeA = a.createdAt?.toMillis() || Date.now();
-                        const timeB = b.createdAt?.toMillis() || Date.now();
-                        return timeB - timeA;
-                    });
+                    
+                    // 應用智慧插入排序邏輯
+                    const sortedData = sortNotesSmartly(data);
+                    
                     setNotes(sortedData);
                     setLoading(false);
                 }, (err) => { setLoading(false); });
@@ -278,7 +313,7 @@
 
             const renderContent = (text) => {
                 if (!text) return null;
-                const urlRegex = /((?:https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,})(?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))?\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))?\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))/gi;
+                const urlRegex = /((?:https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,})(?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))?\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))?\)|[^\s`!()\[\]{};:'".,<>?«»“”指標‘’]))/gi;
                 const parts = text.split(urlRegex);
                 return parts.map((part, i) => {
                     if (part && part.match(urlRegex)) {
@@ -306,6 +341,7 @@
                 );
             }
 
+            // 保持原本的左右分欄顯示方式
             const leftNotes = notes.filter((_, i) => i % 2 === 0);
             const rightNotes = notes.filter((_, i) => i % 2 !== 0);
 
@@ -319,16 +355,19 @@
                         </div>
                         <div className="flex-grow">
                             <div className="flex items-center gap-2.5 p-2.5 bg-white/10 rounded-lg text-xs font-bold">
-                                <Icon name="note" size={14} className="text-[#bb9457]" /> 所有記事
+                                <Icon name="note" size={14} className="text-[#bb9457]" /> 智慧磁吸流
                                 <span className="ml-auto bg-[#bb9457] text-[#432818] px-1.5 py-0.5 rounded-full text-[9px]">{notes.length}</span>
                             </div>
+                            <p className="mt-4 px-2 text-[10px] opacity-40 leading-relaxed">
+                                新筆記預設置頂，但若偵測到重複日期，則會自動插入至該日期事件後方。
+                            </p>
                         </div>
                         <div className="mt-auto space-y-2">
                             <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
                                 <img src={user.photoURL} className="w-7 h-7 rounded border border-[#bb9457]/30" />
                                 <div className="flex-1 overflow-hidden">
                                     <div className="font-bold text-[11px] truncate">{user.displayName}</div>
-                                    <div className="text-[9px] opacity-40 font-bold truncate">已同步雲端</div>
+                                    <div className="text-[9px] opacity-40 font-bold truncate">雲端同步中</div>
                                 </div>
                             </div>
                             <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-1.5 p-2 text-[11px] font-bold text-[#bb9457] hover:bg-white/5 rounded-lg transition-all">
@@ -424,16 +463,15 @@
         function NoteCard({ note, user, appId, renderContent, fullscreenImage, index }) {
             const { db, doc, deleteDoc, updateDoc } = window.FirebaseSDK;
             const [isEditing, setIsEditing] = useState(false);
-            
+            const [editValue, setEditValue] = useState('');
+            const editRef = useRef(null);
+
             const getInitialEditValue = () => {
                 if (!note.targetDate) return note.content;
                 return `${note.targetDate} ${note.content}`.trim();
             };
 
-            const [editValue, setEditValue] = useState(getInitialEditValue());
-            const editRef = useRef(null);
-
-            const isEvenRow = Math.floor(index / 2) % 2 === 0;
+            const isEvenRow = index % 2 === 0;
             const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
 
             useEffect(() => {
@@ -456,20 +494,15 @@
                     setIsEditing(false);
                     return;
                 }
-
                 const newTargetDate = extractDateRange(editValue);
                 const newContent = newTargetDate ? editValue.replace(newTargetDate, '').trim() : editValue;
-
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id), {
                         content: newContent,
                         targetDate: newTargetDate
                     });
                     setIsEditing(false);
-                } catch (err) {
-                    console.error("Update error:", err);
-                    setIsEditing(false);
-                }
+                } catch (err) { setIsEditing(false); }
             };
 
             return (
@@ -484,10 +517,16 @@
                     {note.targetDate && !isEditing && (
                         <button 
                             onClick={() => setIsEditing(true)}
-                            className="flex items-center gap-1.5 text-[10px] font-black text-[#99582a] mb-3 bg-[#99582a]/5 w-fit px-2 py-0.5 rounded-full border border-[#99582a]/10 hover:bg-[#99582a]/10 transition-colors"
+                            className="flex items-center gap-1.5 text-[10px] font-black text-[#99582a] mb-3 bg-[#99582a]/10 w-fit px-2.5 py-1 rounded-full border border-[#99582a]/20 hover:bg-[#99582a]/20 transition-all shadow-sm"
                         >
                             <Icon name="calendar" size={12} /> {note.targetDate}
                         </button>
+                    )}
+
+                    {!note.targetDate && !isEditing && (
+                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#99582a]/40 mb-3 uppercase tracking-wider">
+                            <Icon name="note" size={10} /> Memo
+                        </div>
                     )}
 
                     {note.imageUrl && (
@@ -508,25 +547,16 @@
                                         e.target.style.height = e.target.scrollHeight + 'px';
                                     }}
                                     onBlur={handleUpdate}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && e.ctrlKey) handleUpdate();
-                                        if (e.key === 'Escape') {
-                                            setEditValue(getInitialEditValue());
-                                            setIsEditing(false);
-                                        }
-                                    }}
                                     className="w-full bg-white/50 border-none p-0 text-[17px] font-medium text-[#432818] focus:outline-none resize-none overflow-hidden rounded"
                                 />
-                                <div className="text-[10px] text-[#99582a]/40 font-bold self-end flex items-center gap-1">
-                                    <Icon name="check" size={10} /> 點擊空白處或 Ctrl+Enter 以儲存
-                                </div>
+                                <div className="text-[10px] text-[#99582a]/40 font-bold self-end flex items-center gap-1"><Icon name="check" size={10} /> 點擊空白處儲存</div>
                             </div>
                         ) : (
                             <div 
                                 onClick={() => setIsEditing(true)}
                                 className="text-[#432818] text-[17px] font-medium leading-relaxed whitespace-pre-wrap break-words cursor-text min-h-[1.5em] hover:bg-[#99582a]/5 rounded transition-colors"
                             >
-                                {renderContent(note.content) || <span className="opacity-20 italic text-sm">無文字內容...</span>}
+                                {renderContent(note.content) || <span className="opacity-20 italic text-sm">點擊填寫內容...</span>}
                             </div>
                         )}
                     </div>
