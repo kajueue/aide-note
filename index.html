@@ -71,6 +71,11 @@
         textarea, input {
             font-size: 16px !important;
         }
+
+        /* 編輯模式下的光標效果 */
+        .editing-glow {
+            box-shadow: 0 0 0 2px rgba(153, 88, 42, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -78,7 +83,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -96,7 +101,7 @@
 
         window.FirebaseSDK = {
             app, db, auth, 
-            collection, addDoc, onSnapshot, doc, deleteDoc, query, serverTimestamp, 
+            collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, serverTimestamp, 
             GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
         };
     </script>
@@ -136,6 +141,7 @@
                         <path d="M22 2 11 13"/>
                     </>
                 ),
+                check: <path d="M20 6 9 17l-5-5" />,
                 logOut: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />,
                 google: <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
             };
@@ -433,28 +439,92 @@
         }
 
         function NoteCard({ note, user, appId, renderContent, fullscreenImage, index }) {
-            const { db, doc, deleteDoc } = window.FirebaseSDK;
+            const { db, doc, deleteDoc, updateDoc } = window.FirebaseSDK;
+            const [isEditing, setIsEditing] = useState(false);
+            const [editValue, setEditValue] = useState(note.content);
+            const editRef = useRef(null);
+
             const isEvenRow = Math.floor(index / 2) % 2 === 0;
             const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
 
+            useEffect(() => {
+                if (isEditing && editRef.current) {
+                    editRef.current.focus();
+                    editRef.current.style.height = 'auto';
+                    editRef.current.style.height = editRef.current.scrollHeight + 'px';
+                }
+            }, [isEditing]);
+
+            const handleUpdate = async () => {
+                if (editValue === note.content) {
+                    setIsEditing(false);
+                    return;
+                }
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id), {
+                        content: editValue
+                    });
+                    setIsEditing(false);
+                } catch (err) {
+                    console.error("Update error:", err);
+                    setIsEditing(false);
+                }
+            };
+
             return (
-                <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border ${bgClass}`}>
-                    <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
-                            className="absolute top-3 right-3 text-[#d5bdaf] hover:text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all p-1.5 hover:bg-white rounded-full z-10">
-                        <Icon name="trash" size={14} />
-                    </button>
+                <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border ${bgClass} ${isEditing ? 'editing-glow ring-1 ring-[#99582a]/20' : ''}`}>
+                    {!isEditing && (
+                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
+                                className="absolute top-3 right-3 text-[#d5bdaf] hover:text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all p-1.5 hover:bg-white rounded-full z-10">
+                            <Icon name="trash" size={14} />
+                        </button>
+                    )}
+                    
                     {note.targetDate && (
                         <div className="flex items-center gap-1.5 text-[10px] font-black text-[#99582a] mb-3 bg-[#99582a]/5 w-fit px-2 py-0.5 rounded-full border border-[#99582a]/10">
                             <Icon name="calendar" size={12} /> {note.targetDate}
                         </div>
                     )}
+
                     {note.imageUrl && (
                         <div className="relative mb-4 cursor-zoom-in overflow-hidden rounded shadow-sm bg-black/5" onClick={() => fullscreenImage(note.imageUrl)}>
                             <img src={note.imageUrl} className="w-full h-auto max-h-[350px] object-cover" />
                         </div>
                     )}
-                    <div className="text-[#432818] text-[17px] font-medium leading-relaxed whitespace-pre-wrap break-words">
-                        {renderContent(note.content)}
+
+                    <div className="relative">
+                        {isEditing ? (
+                            <div className="flex flex-col gap-2">
+                                <textarea
+                                    ref={editRef}
+                                    value={editValue}
+                                    onChange={(e) => {
+                                        setEditValue(e.target.value);
+                                        e.target.style.height = 'auto';
+                                        e.target.style.height = e.target.scrollHeight + 'px';
+                                    }}
+                                    onBlur={handleUpdate}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && e.ctrlKey) handleUpdate();
+                                        if (e.key === 'Escape') {
+                                            setEditValue(note.content);
+                                            setIsEditing(false);
+                                        }
+                                    }}
+                                    className="w-full bg-white/50 border-none p-0 text-[17px] font-medium text-[#432818] focus:outline-none resize-none overflow-hidden rounded"
+                                />
+                                <div className="text-[10px] text-[#99582a]/40 font-bold self-end flex items-center gap-1">
+                                    <Icon name="check" size={10} /> 點擊空白處或 Ctrl+Enter 以儲存
+                                </div>
+                            </div>
+                        ) : (
+                            <div 
+                                onClick={() => setIsEditing(true)}
+                                className="text-[#432818] text-[17px] font-medium leading-relaxed whitespace-pre-wrap break-words cursor-text min-h-[1.5em] hover:bg-[#99582a]/5 rounded transition-colors"
+                            >
+                                {renderContent(note.content) || <span className="opacity-20 italic text-sm">無文字內容...</span>}
+                            </div>
+                        )}
                     </div>
                 </article>
             );
