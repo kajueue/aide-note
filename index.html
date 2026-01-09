@@ -72,7 +72,6 @@
             font-size: 16px !important;
         }
 
-        /* 編輯模式下的光標效果 */
         .editing-glow {
             box-shadow: 0 0 0 2px rgba(153, 88, 42, 0.2);
         }
@@ -108,6 +107,25 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+
+        // 全域日期解析函數
+        const extractDateRange = (text) => {
+            const yearPart = "(?:\\d{4}[\\/\\-年])?";
+            const monthDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?)";
+            const connector = "[\\-\\~\\～\\—\\至\\到\\s]+";
+            const trailingDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?|\\d{1,2}日?)";
+            
+            const fullRangeRegex = new RegExp(`${yearPart}${monthDayPart}${connector}${trailingDayPart}`, "i");
+            const singleDateRegex = new RegExp(`${yearPart}${monthDayPart}`, "i");
+            
+            const rangeMatch = text.match(fullRangeRegex);
+            if (rangeMatch) return rangeMatch[0];
+            
+            const singleMatch = text.match(singleDateRegex);
+            if (singleMatch) return singleMatch[0];
+            
+            return null;
+        };
 
         const Icon = ({ name, size = 18, className = "", fill = "none" }) => {
             const icons = {
@@ -172,7 +190,6 @@
             const [selectedImage, setSelectedImage] = useState(null);
             const [isUploading, setIsUploading] = useState(false);
             const [fullscreenImage, setFullscreenImage] = useState(null);
-            const [errorMessage, setErrorMessage] = useState(null);
             
             const fileInputRef = useRef(null);
             const textareaRef = useRef(null);
@@ -183,10 +200,7 @@
                 const { auth, onAuthStateChanged } = window.FirebaseSDK;
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     setUser(u);
-                    if (!u) {
-                        setNotes([]);
-                        setLoading(false);
-                    }
+                    if (!u) { setNotes([]); setLoading(false); }
                 });
                 return () => unsubscribe();
             }, []);
@@ -206,10 +220,7 @@
                     });
                     setNotes(sortedData);
                     setLoading(false);
-                }, (err) => {
-                    console.error("Firestore error:", err);
-                    setLoading(false);
-                });
+                }, (err) => { setLoading(false); });
                 return () => unsubscribe();
             }, [user]);
 
@@ -222,14 +233,9 @@
             }, [inputValue]);
 
             const handleGoogleSignIn = async () => {
-                setErrorMessage(null);
                 const { auth, GoogleAuthProvider, signInWithPopup } = window.FirebaseSDK;
                 const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (error) {
-                    setErrorMessage("登入失敗：" + error.message);
-                }
+                try { await signInWithPopup(auth, provider); } catch (error) {}
             };
 
             const handleSignOut = () => {
@@ -243,9 +249,7 @@
                     if (items[i].type.indexOf("image") !== -1) {
                         const blob = items[i].getAsFile();
                         const reader = new FileReader();
-                        reader.onloadend = () => {
-                            setSelectedImage(reader.result);
-                        };
+                        reader.onloadend = () => setSelectedImage(reader.result);
                         reader.readAsDataURL(blob);
                     }
                 }
@@ -255,24 +259,6 @@
                 if ((!inputValue.trim() && !selectedImage) || !user) return;
                 setIsUploading(true);
                 const { db, collection, addDoc, serverTimestamp } = window.FirebaseSDK;
-
-                const extractDateRange = (text) => {
-                    const yearPart = "(?:\\d{4}[\\/\\-年])?";
-                    const monthDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?)";
-                    const connector = "[\\-\\~\\～\\—\\至\\到\\s]+";
-                    const trailingDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?|\\d{1,2}日?)";
-                    
-                    const fullRangeRegex = new RegExp(`${yearPart}${monthDayPart}${connector}${trailingDayPart}`, "i");
-                    const singleDateRegex = new RegExp(`${yearPart}${monthDayPart}`, "i");
-                    
-                    const rangeMatch = text.match(fullRangeRegex);
-                    if (rangeMatch) return rangeMatch[0];
-                    
-                    const singleMatch = text.match(singleDateRegex);
-                    if (singleMatch) return singleMatch[0];
-                    
-                    return null;
-                };
 
                 const targetDate = extractDateRange(inputValue);
                 const finalContent = targetDate ? inputValue.replace(targetDate, '').trim() : inputValue;
@@ -313,8 +299,7 @@
                             <h1 className="text-2xl font-black text-[#432818] mb-1">大地記事</h1>
                             <p className="text-[#99582a]/60 text-sm font-medium mb-8">個人專屬的靈感備忘錄</p>
                             <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center gap-3 py-3.5 px-6 bg-[#432818] text-white rounded-xl font-bold hover:bg-[#3d1f0a] active:scale-95 transition-all shadow-md text-sm">
-                                <Icon name="google" size={18} fill="white" />
-                                使用 Google 帳號登入
+                                <Icon name="google" size={18} fill="white" /> 使用 Google 帳號登入
                             </button>
                         </div>
                     </div>
@@ -334,8 +319,7 @@
                         </div>
                         <div className="flex-grow">
                             <div className="flex items-center gap-2.5 p-2.5 bg-white/10 rounded-lg text-xs font-bold">
-                                <Icon name="note" size={14} className="text-[#bb9457]" />
-                                所有記事
+                                <Icon name="note" size={14} className="text-[#bb9457]" /> 所有記事
                                 <span className="ml-auto bg-[#bb9457] text-[#432818] px-1.5 py-0.5 rounded-full text-[9px]">{notes.length}</span>
                             </div>
                         </div>
@@ -360,9 +344,7 @@
                             </h1>
                             <div className="flex items-center gap-2">
                                 <img src={user.photoURL} className="w-7 h-7 rounded-full border border-[#99582a]/20" />
-                                <button onClick={handleSignOut} className="p-1.5 text-[#99582a] bg-white/60 rounded-full">
-                                    <Icon name="logOut" size={16} />
-                                </button>
+                                <button onClick={handleSignOut} className="p-1.5 text-[#99582a] bg-white/60 rounded-full"><Icon name="logOut" size={16} /></button>
                             </div>
                         </header>
 
@@ -390,6 +372,7 @@
                                         value={inputValue} 
                                         onChange={(e) => setInputValue(e.target.value)} 
                                         onPaste={handlePaste}
+                                        placeholder="記錄靈感或日期 (例如: 1/15 聚餐)..."
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !('ontouchstart' in window) && !e.shiftKey) { e.preventDefault(); handleAddNote(); }
                                         }} 
@@ -441,11 +424,24 @@
         function NoteCard({ note, user, appId, renderContent, fullscreenImage, index }) {
             const { db, doc, deleteDoc, updateDoc } = window.FirebaseSDK;
             const [isEditing, setIsEditing] = useState(false);
-            const [editValue, setEditValue] = useState(note.content);
+            
+            // 進入編輯模式時，將日期接回內容字串的前面
+            const getInitialEditValue = () => {
+                if (!note.targetDate) return note.content;
+                return `${note.targetDate} ${note.content}`.trim();
+            };
+
+            const [editValue, setEditValue] = useState(getInitialEditValue());
             const editRef = useRef(null);
 
             const isEvenRow = Math.floor(index / 2) % 2 === 0;
             const bgClass = isEvenRow ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
+
+            useEffect(() => {
+                if (isEditing) {
+                    setEditValue(getInitialEditValue());
+                }
+            }, [isEditing]);
 
             useEffect(() => {
                 if (isEditing && editRef.current) {
@@ -456,13 +452,20 @@
             }, [isEditing]);
 
             const handleUpdate = async () => {
-                if (editValue === note.content) {
+                const initial = getInitialEditValue();
+                if (editValue === initial) {
                     setIsEditing(false);
                     return;
                 }
+
+                // 重新解析日期
+                const newTargetDate = extractDateRange(editValue);
+                const newContent = newTargetDate ? editValue.replace(newTargetDate, '').trim() : editValue;
+
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id), {
-                        content: editValue
+                        content: newContent,
+                        targetDate: newTargetDate
                     });
                     setIsEditing(false);
                 } catch (err) {
@@ -480,10 +483,13 @@
                         </button>
                     )}
                     
-                    {note.targetDate && (
-                        <div className="flex items-center gap-1.5 text-[10px] font-black text-[#99582a] mb-3 bg-[#99582a]/5 w-fit px-2 py-0.5 rounded-full border border-[#99582a]/10">
+                    {note.targetDate && !isEditing && (
+                        <button 
+                            onClick={() => setIsEditing(true)}
+                            className="flex items-center gap-1.5 text-[10px] font-black text-[#99582a] mb-3 bg-[#99582a]/5 w-fit px-2 py-0.5 rounded-full border border-[#99582a]/10 hover:bg-[#99582a]/10 transition-colors"
+                        >
                             <Icon name="calendar" size={12} /> {note.targetDate}
-                        </div>
+                        </button>
                     )}
 
                     {note.imageUrl && (
@@ -507,7 +513,7 @@
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && e.ctrlKey) handleUpdate();
                                         if (e.key === 'Escape') {
-                                            setEditValue(note.content);
+                                            setEditValue(getInitialEditValue());
                                             setIsEditing(false);
                                         }
                                     }}
