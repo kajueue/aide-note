@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>大地記事 - 圖片顯示優化版</title>
+    <title>大地記事 - 介面優化版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -35,7 +35,6 @@
             color: var(--earth-dark);
             overflow-x: hidden;
             overscroll-behavior: none;
-            touch-action: pan-x pan-y;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -68,10 +67,6 @@
 
         textarea, input {
             font-size: 16px !important;
-        }
-
-        .editing-glow {
-            box-shadow: 0 0 0 2px rgba(153, 88, 42, 0.2);
         }
     </style>
 </head>
@@ -114,7 +109,6 @@
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
-
                     if (width > height) {
                         if (width > maxWidth) {
                             height *= maxWidth / width;
@@ -126,7 +120,6 @@
                             height = maxHeight;
                         }
                     }
-
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
@@ -141,16 +134,12 @@
             const monthDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?)";
             const connector = "[\\-\\~\\～\\—\\至\\到\\s]+";
             const trailingDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?|\\d{1,2}日?)";
-            
             const fullRangeRegex = new RegExp(`${yearPart}${monthDayPart}${connector}${trailingDayPart}`, "i");
             const singleDateRegex = new RegExp(`${yearPart}${monthDayPart}`, "i");
-            
             const rangeMatch = text.match(fullRangeRegex);
             if (rangeMatch) return rangeMatch[0];
-            
             const singleMatch = text.match(singleDateRegex);
             if (singleMatch) return singleMatch[0];
-            
             return null;
         };
 
@@ -160,13 +149,10 @@
                 const timeB = b.createdAt?.toMillis() || Date.now();
                 return timeB - timeA;
             });
-
             const result = [];
             const handledIds = new Set();
-
             sortedByCreated.forEach(note => {
                 if (handledIds.has(note.id)) return;
-
                 if (note.targetDate) {
                     const targetIdx = result.findIndex(r => r.targetDate === note.targetDate);
                     if (targetIdx !== -1) {
@@ -179,7 +165,6 @@
                 }
                 handledIds.add(note.id);
             });
-
             return result;
         };
 
@@ -219,7 +204,6 @@
                 logOut: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />,
                 google: <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
             };
-
             return (
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -266,7 +250,6 @@
                 setLoading(true);
                 const { db, collection, query, onSnapshot } = window.FirebaseSDK;
                 const notesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'notes');
-                
                 const unsubscribe = onSnapshot(query(notesRef), (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setNotes(sortNotesSmartly(data));
@@ -318,10 +301,8 @@
                 if ((!inputValue.trim() && !selectedImage) || !user) return;
                 setIsUploading(true);
                 const { db, collection, addDoc, serverTimestamp } = window.FirebaseSDK;
-
                 const targetDate = extractDateRange(inputValue);
                 const finalContent = targetDate ? inputValue.replace(targetDate, '').trim() : inputValue;
-
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), {
                         content: finalContent || (selectedImage ? "" : targetDate),
@@ -398,72 +379,78 @@
                         </div>
                     </aside>
 
-                    <main className="flex-1 md:ml-60 p-4 md:p-6 lg:p-10 bg-[#f5ebe0]">
-                        <header className="md:hidden flex items-center justify-between mb-5 px-1">
-                            <h1 className="text-lg font-black text-[#432818] flex items-center gap-2">
-                                <Icon name="note" size={18} className="text-[#99582a]" /> 大地記事
-                            </h1>
-                            <div className="flex items-center gap-2">
-                                <img src={user.photoURL} className="w-7 h-7 rounded-full border border-[#99582a]/20" />
-                                <button onClick={handleSignOut} className="p-1.5 text-[#99582a] bg-white/60 rounded-full"><Icon name="logOut" size={16} /></button>
-                            </div>
-                        </header>
+                    <main className="flex-1 md:ml-60 bg-[#f5ebe0] pb-10">
+                        {/* 頂部 Header & 輸入區 */}
+                        <div className="bg-white/40 backdrop-blur-sm border-b border-[#e3d5ca] px-4 py-4 md:px-8 md:py-6 mb-6">
+                            <header className="md:hidden flex items-center justify-between mb-4">
+                                <h1 className="text-lg font-black text-[#432818] flex items-center gap-2">
+                                    <Icon name="note" size={18} className="text-[#99582a]" /> 大地記事
+                                </h1>
+                                <div className="flex items-center gap-2">
+                                    <img src={user.photoURL} className="w-7 h-7 rounded-full border border-[#99582a]/20" />
+                                    <button onClick={handleSignOut} className="p-1.5 text-[#99582a] bg-white/60 rounded-full"><Icon name="logOut" size={16} /></button>
+                                </div>
+                            </header>
 
-                        <section className="max-w-xl mx-auto mb-6 md:mb-10 sticky top-2 z-10">
-                            <div className="bg-white/95 backdrop-blur-md rounded-[20px] card-shadow border border-[#e3d5ca] overflow-hidden focus-within:ring-2 focus-within:ring-[#99582a]/10 transition-all px-1.5 py-0.5">
-                                {selectedImage && (
-                                    <div className="p-2 bg-[#fdfaf6] border-b border-[#f5ebe0] relative flex justify-center group rounded-t-[16px] mb-1">
-                                        <img src={selectedImage} className="max-h-40 rounded shadow-sm" />
-                                        <button onClick={() => setSelectedImage(null)} className="absolute top-3 right-3 p-1 bg-[#432818] text-white rounded-full"><Icon name="x" size={12} /></button>
+                            <div className="max-w-xl mx-auto">
+                                <div className="bg-white rounded-[20px] card-shadow border border-[#e3d5ca] overflow-hidden focus-within:ring-2 focus-within:ring-[#99582a]/10 transition-all px-1.5 py-0.5">
+                                    {selectedImage && (
+                                        <div className="p-2 bg-[#fdfaf6] border-b border-[#f5ebe0] relative flex justify-center group rounded-t-[16px] mb-1">
+                                            <img src={selectedImage} className="max-h-40 rounded shadow-sm" />
+                                            <button onClick={() => setSelectedImage(null)} className="absolute top-3 right-3 p-1 bg-[#432818] text-white rounded-full"><Icon name="x" size={12} /></button>
+                                        </div>
+                                    )}
+                                    <div className="flex items-end gap-0.5">
+                                        <button onClick={() => fileInputRef.current.click()} className="p-2.5 text-[#99582a] hover:bg-[#99582a]/5 rounded-lg transition-all active:scale-90 shrink-0"><Icon name="image" size={20} /></button>
+                                        <input type="file" ref={fileInputRef} onChange={(e) => handleImageProcess(e.target.files[0])} className="hidden" accept="image/*" />
+                                        <textarea 
+                                            ref={textareaRef} 
+                                            rows="1" 
+                                            value={inputValue} 
+                                            onChange={(e) => setInputValue(e.target.value)} 
+                                            onPaste={handlePaste}
+                                            placeholder="在此輸入內容或日期..."
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !('ontouchstart' in window) && !e.shiftKey) { e.preventDefault(); handleAddNote(); }
+                                            }} 
+                                            className="flex-1 bg-transparent border-none py-2.5 text-[16px] font-medium text-[#432818] focus:outline-none resize-none no-scrollbar placeholder-[#99582a]/30" 
+                                        />
+                                        <button onClick={handleAddNote} disabled={isUploading || (!inputValue.trim() && !selectedImage)} className="p-2.5 bg-[#432818] text-[#f5ebe0] rounded-lg shadow-md active:scale-95 disabled:opacity-20 transition-all shrink-0 m-1">
+                                            {isUploading ? <Icon name="loader" size={18} className="animate-spin" /> : <Icon name="send" size={18} />}
+                                        </button>
                                     </div>
-                                )}
-                                <div className="flex items-end gap-0.5">
-                                    <button onClick={() => fileInputRef.current.click()} className="p-2.5 text-[#99582a] hover:bg-[#99582a]/5 rounded-lg transition-all active:scale-90 shrink-0"><Icon name="image" size={20} /></button>
-                                    <input type="file" ref={fileInputRef} onChange={(e) => handleImageProcess(e.target.files[0])} className="hidden" accept="image/*" />
-                                    <textarea 
-                                        ref={textareaRef} 
-                                        rows="1" 
-                                        value={inputValue} 
-                                        onChange={(e) => setInputValue(e.target.value)} 
-                                        onPaste={handlePaste}
-                                        placeholder=""
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !('ontouchstart' in window) && !e.shiftKey) { e.preventDefault(); handleAddNote(); }
-                                        }} 
-                                        className="flex-1 bg-transparent border-none py-2.5 text-[16px] font-medium text-[#432818] focus:outline-none resize-none no-scrollbar" 
-                                    />
-                                    <button onClick={handleAddNote} disabled={isUploading || (!inputValue.trim() && !selectedImage)} className="p-2.5 bg-[#432818] text-[#f5ebe0] rounded-lg shadow-md active:scale-95 disabled:opacity-20 transition-all shrink-0 m-1">
-                                        {isUploading ? <Icon name="loader" size={18} className="animate-spin" /> : <Icon name="send" size={18} />}
-                                    </button>
                                 </div>
                             </div>
-                        </section>
+                        </div>
 
-                        <section className="max-w-4xl mx-auto">
-                            {loading ? (
-                                <div className="flex justify-center py-10"><Icon name="loader" size={20} className="animate-spin text-[#99582a]" /></div>
-                            ) : (
-                                <>
-                                    <div className="flex flex-col gap-5 md:hidden">
-                                        {notes.map((note, index) => (
-                                            <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={index} />
-                                        ))}
-                                    </div>
-                                    <div className="hidden md:flex gap-6 items-start">
-                                        <div className="flex-1 flex flex-col gap-6">
-                                            {leftNotes.map((note, idx) => (
-                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={idx * 2} />
+                        {/* 筆記列表區 */}
+                        <div className="px-4 md:px-8 lg:px-10">
+                            <section className="max-w-4xl mx-auto">
+                                {loading ? (
+                                    <div className="flex justify-center py-10"><Icon name="loader" size={20} className="animate-spin text-[#99582a]" /></div>
+                                ) : (
+                                    <>
+                                        <div className="flex flex-col gap-5 md:hidden">
+                                            {notes.map((note, index) => (
+                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={index} />
                                             ))}
                                         </div>
-                                        <div className="flex-1 flex flex-col gap-6">
-                                            {rightNotes.map((note, idx) => (
-                                                <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={idx * 2 + 1} />
-                                            ))}
+                                        <div className="hidden md:flex gap-6 items-start">
+                                            <div className="flex-1 flex flex-col gap-6">
+                                                {leftNotes.map((note, idx) => (
+                                                    <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={idx * 2} />
+                                                ))}
+                                            </div>
+                                            <div className="flex-1 flex flex-col gap-6">
+                                                {rightNotes.map((note, idx) => (
+                                                    <NoteCard key={note.id} note={note} user={user} appId={appId} renderContent={renderContent} fullscreenImage={setFullscreenImage} index={idx * 2 + 1} />
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                </>
-                            )}
-                        </section>
+                                    </>
+                                )}
+                            </section>
+                        </div>
                     </main>
 
                     {fullscreenImage && (
@@ -480,6 +467,10 @@
             const [isEditing, setIsEditing] = useState(false);
             const [editValue, setEditValue] = useState('');
             const editRef = useRef(null);
+
+            const hasContent = note.content && note.content.trim() !== "";
+            const hasImage = !!note.imageUrl;
+            const hasDate = !!note.targetDate;
 
             const getInitialEditValue = () => {
                 if (!note.targetDate) return note.content;
@@ -521,13 +512,8 @@
                 } catch (err) { setIsEditing(false); }
             };
 
-            // 判斷是否需要顯示提示字
-            const hasContent = note.content && note.content.trim() !== "";
-            const hasImage = !!note.imageUrl;
-            const showPlaceholder = !hasContent && !hasImage;
-
             return (
-                <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border ${bgClass} ${isEditing ? 'editing-glow ring-1 ring-[#99582a]/20' : ''}`}>
+                <article className={`note-card rounded-2xl p-5 md:p-6 card-shadow relative animate-fade-in group border ${bgClass} ${isEditing ? 'ring-2 ring-[#99582a]/20' : ''}`}>
                     {!isEditing && (
                         <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
                                 className="absolute top-3 right-3 text-[#d5bdaf] hover:text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all p-1.5 hover:bg-white rounded-full z-10">
@@ -535,7 +521,7 @@
                         </button>
                     )}
                     
-                    {note.targetDate && !isEditing && (
+                    {hasDate && !isEditing && (
                         <button 
                             onClick={() => setIsEditing(true)}
                             className="flex items-center gap-1.5 text-[10px] font-black text-[#99582a] mb-3 bg-[#99582a]/10 w-fit px-2.5 py-1 rounded-full border border-[#99582a]/20 hover:bg-[#99582a]/20 transition-all shadow-sm"
@@ -544,37 +530,39 @@
                         </button>
                     )}
 
-                    {note.imageUrl && (
-                        <div className="relative mb-4 cursor-zoom-in overflow-hidden rounded shadow-sm bg-black/5" onClick={() => fullscreenImage(note.imageUrl)}>
-                            <img src={note.imageUrl} className="w-full h-auto max-h-[350px] object-cover" />
+                    {hasImage && (
+                        <div className={`relative cursor-zoom-in overflow-hidden rounded shadow-sm bg-black/5 ${hasContent ? 'mb-4' : ''}`} onClick={() => fullscreenImage(note.imageUrl)}>
+                            <img src={note.imageUrl} className="w-full h-auto max-h-[450px] object-cover" />
                         </div>
                     )}
 
-                    <div className="relative">
-                        {isEditing ? (
-                            <div className="flex flex-col gap-2">
-                                <textarea
-                                    ref={editRef}
-                                    value={editValue}
-                                    onChange={(e) => {
-                                        setEditValue(e.target.value);
-                                        e.target.style.height = 'auto';
-                                        e.target.style.height = e.target.scrollHeight + 'px';
-                                    }}
-                                    onBlur={handleUpdate}
-                                    className="w-full bg-white/50 border-none p-0 text-[17px] font-medium text-[#432818] focus:outline-none resize-none overflow-hidden rounded"
-                                />
-                                <div className="text-[10px] text-[#99582a]/40 font-bold self-end flex items-center gap-1"><Icon name="check" size={10} /> 點擊空白處儲存</div>
-                            </div>
-                        ) : (
-                            <div 
-                                onClick={() => setIsEditing(true)}
-                                className={`text-[#432818] text-[17px] font-medium leading-relaxed whitespace-pre-wrap break-words cursor-text min-h-[1.5em] hover:bg-[#99582a]/5 rounded transition-colors ${!hasContent ? 'h-0 min-h-0' : ''}`}
-                            >
-                                {renderContent(note.content) || (showPlaceholder ? <span className="opacity-20 italic text-sm">點擊填寫內容...</span> : null)}
-                            </div>
-                        )}
-                    </div>
+                    {(hasContent || isEditing) && (
+                        <div className="relative">
+                            {isEditing ? (
+                                <div className="flex flex-col gap-2">
+                                    <textarea
+                                        ref={editRef}
+                                        value={editValue}
+                                        onChange={(e) => {
+                                            setEditValue(e.target.value);
+                                            e.target.style.height = 'auto';
+                                            e.target.style.height = e.target.scrollHeight + 'px';
+                                        }}
+                                        onBlur={handleUpdate}
+                                        className="w-full bg-white/50 border-none p-0 text-[17px] font-medium text-[#432818] focus:outline-none resize-none overflow-hidden rounded"
+                                    />
+                                    <div className="text-[10px] text-[#99582a]/40 font-bold self-end flex items-center gap-1"><Icon name="check" size={10} /> 點擊空白處儲存</div>
+                                </div>
+                            ) : (
+                                <div 
+                                    onClick={() => setIsEditing(true)}
+                                    className="text-[#432818] text-[17px] font-medium leading-relaxed whitespace-pre-wrap break-words cursor-text hover:bg-[#99582a]/5 rounded transition-colors"
+                                >
+                                    {renderContent(note.content)}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </article>
             );
         }
