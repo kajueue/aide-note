@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>大地記事 - 智慧排序簡潔版</title>
+    <title>大地記事 - 智慧排序壓縮優化版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -105,6 +105,38 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+
+        // 圖片壓縮工具函式
+        const compressImage = (base64Str, maxWidth = 1024, maxHeight = 1024) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    // 壓縮品質設定為 0.7，大幅減少體積
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+            });
+        };
 
         const extractDateRange = (text) => {
             const yearPart = "(?:\\d{4}[\\/\\-年])?";
@@ -264,14 +296,23 @@
                 signOut(auth);
             };
 
+            const handleImageProcess = async (file) => {
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    // 執行壓縮處理
+                    const compressed = await compressImage(reader.result);
+                    setSelectedImage(compressed);
+                };
+                reader.readAsDataURL(file);
+            };
+
             const handlePaste = (e) => {
                 const items = e.clipboardData.items;
                 for (let i = 0; i < items.length; i++) {
                     if (items[i].type.indexOf("image") !== -1) {
                         const blob = items[i].getAsFile();
-                        const reader = new FileReader();
-                        reader.onloadend = () => setSelectedImage(reader.result);
-                        reader.readAsDataURL(blob);
+                        handleImageProcess(blob);
                     }
                 }
             };
@@ -293,7 +334,10 @@
                     });
                     setInputValue('');
                     setSelectedImage(null);
-                } catch (error) { console.error(error); }
+                } catch (error) { 
+                    console.error("儲存失敗：可能因圖片過大或網路問題", error);
+                    // 這裡可以加入一個簡單的錯誤提示 UI，但依規範不使用 alert
+                }
                 finally { setIsUploading(false); }
             };
 
@@ -379,14 +423,7 @@
                                 )}
                                 <div className="flex items-end gap-0.5">
                                     <button onClick={() => fileInputRef.current.click()} className="p-2.5 text-[#99582a] hover:bg-[#99582a]/5 rounded-lg transition-all active:scale-90 shrink-0"><Icon name="image" size={20} /></button>
-                                    <input type="file" ref={fileInputRef} onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => setSelectedImage(reader.result);
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }} className="hidden" accept="image/*" />
+                                    <input type="file" ref={fileInputRef} onChange={(e) => handleImageProcess(e.target.files[0])} className="hidden" accept="image/*" />
                                     <textarea 
                                         ref={textareaRef} 
                                         rows="1" 
@@ -453,7 +490,7 @@
                 return `${note.targetDate} ${note.content}`.trim();
             };
 
-            // 調整背景色彩邏輯：1,2 同色；3,4 同色 (使用除以 2 的整數判斷)
+            // 背景色彩邏輯：1,2 同色；3,4 同色
             const rowGroup = Math.floor(index / 2);
             const isEvenGroup = rowGroup % 2 === 0;
             const bgClass = isEvenGroup ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
