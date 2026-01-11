@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>大地記事 - 極簡緊湊版</title>
+    <title>大地記事 - 窄側欄版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -353,15 +353,16 @@
 
             return (
                 <div className="flex flex-col md:flex-row min-h-screen">
-                    <aside className="hidden md:flex w-60 wood-texture bg-[#432818] text-[#f5ebe0] flex-col p-5 fixed h-full shadow-2xl z-20">
+                    {/* 窄化側邊欄: w-60 -> w-48 */}
+                    <aside className="hidden md:flex w-48 wood-texture bg-[#432818] text-[#f5ebe0] flex-col p-4 fixed h-full shadow-2xl z-20">
                         <div className="mb-8">
                             <h1 className="text-lg font-black flex items-center gap-2">
                                 <Icon name="note" size={20} className="text-[#bb9457]" /> 大地記事
                             </h1>
                         </div>
                         <div className="flex-grow">
-                            <div className="flex items-center gap-2.5 p-2.5 bg-white/10 rounded-lg text-xs font-bold">
-                                <Icon name="note" size={14} className="text-[#bb9457]" /> 目前事件
+                            <div className="flex items-center gap-2.5 p-2 bg-white/10 rounded-lg text-[11px] font-bold">
+                                <Icon name="note" size={13} className="text-[#bb9457]" /> 目前事件
                                 <span className="ml-auto bg-[#bb9457] text-[#432818] px-1.5 py-0.5 rounded-full text-[9px]">{notes.length}</span>
                             </div>
                         </div>
@@ -369,17 +370,18 @@
                             <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
                                 <img src={user.photoURL} className="w-7 h-7 rounded border border-[#bb9457]/30" />
                                 <div className="flex-1 overflow-hidden">
-                                    <div className="font-bold text-[11px] truncate">{user.displayName}</div>
+                                    <div className="font-bold text-[10px] truncate">{user.displayName}</div>
                                     <div className="text-[9px] opacity-40 font-bold truncate">雲端同步中</div>
                                 </div>
                             </div>
-                            <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-1.5 p-2 text-[11px] font-bold text-[#bb9457] hover:bg-white/5 rounded-lg transition-all">
-                                <Icon name="logOut" size={12} /> 登出
+                            <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-1.5 p-2 text-[10px] font-bold text-[#bb9457] hover:bg-white/5 rounded-lg transition-all">
+                                <Icon name="logOut" size={11} /> 登出
                             </button>
                         </div>
                     </aside>
 
-                    <main className="flex-1 md:ml-60 bg-[#f5ebe0] pb-10">
+                    {/* 主內容區對應調整: ml-60 -> ml-48 */}
+                    <main className="flex-1 md:ml-48 bg-[#f5ebe0] pb-10">
                         {/* 頂部 Header & 輸入區 */}
                         <div className="bg-white/40 backdrop-blur-sm border-b border-[#e3d5ca] px-4 py-4 md:px-8 md:py-4 mb-4">
                             <header className="md:hidden flex items-center justify-between mb-4">
