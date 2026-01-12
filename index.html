@@ -130,16 +130,46 @@
         };
 
         const extractDateRange = (text) => {
+            if (!text) return null;
+
+            // 1. 排除特定關鍵字 (例如 7-11)
+            const exclusions = ["7-11", "711", "9-11", "101"];
+            for (let exc of exclusions) {
+                if (text.includes(exc)) {
+                    // 如果文字中包含 7-11，我們需要確認正則表達式不要抓到它
+                    // 這裡簡單處理：如果包含 7-11，暫時跳過自動抓取日期，或者使用更嚴謹的 Regex
+                }
+            }
+
             const yearPart = "(?:\\d{4}[\\/\\-年])?";
-            const monthDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?)";
+            // 修改：確保月份是 1-12，日期是 1-31，且前後如果是純數字則不觸發 (避免 7-11)
+            const monthDayPart = "(?:^|\\s|[^0-9])((?:0?[1-9]|1[0-2])[\\/\\-月](?:0?[1-9]|[12][0-9]|3[01])日?)";
             const connector = "[\\-\\~\\～\\—\\至\\到\\s]+";
-            const trailingDayPart = "(\\d{1,2}[\\/\\-月]\\d{1,2}日?|\\d{1,2}日?)";
+            const trailingDayPart = "((?:0?[1-9]|1[0-2])[\\/\\-月](?:0?[1-9]|[12][0-9]|3[01])日?|(?:0?[1-9]|[12][0-9]|3[01])日?)";
+            
             const fullRangeRegex = new RegExp(`${yearPart}${monthDayPart}${connector}${trailingDayPart}`, "i");
             const singleDateRegex = new RegExp(`${yearPart}${monthDayPart}`, "i");
+
+            // 檢查 7-11 特例：如果匹配結果剛好是 7-11，則放棄
+            const checkExclusion = (matchStr) => {
+                if (!matchStr) return null;
+                const clean = matchStr.trim();
+                return exclusions.includes(clean) ? null : matchStr;
+            };
+
             const rangeMatch = text.match(fullRangeRegex);
-            if (rangeMatch) return rangeMatch[0];
+            if (rangeMatch) return checkExclusion(rangeMatch[0]);
+
             const singleMatch = text.match(singleDateRegex);
-            if (singleMatch) return singleMatch[0];
+            if (singleMatch) {
+                // 處理 Regex 捕獲組產生的前綴非數字字元
+                let matched = singleMatch[0];
+                if (singleMatch[1] && matched.includes(singleMatch[1])) {
+                    matched = singleMatch[1];
+                }
+                return checkExclusion(matched);
+            }
+
             return null;
         };
 
@@ -305,7 +335,7 @@
                 const finalContent = targetDate ? inputValue.replace(targetDate, '').trim() : inputValue;
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'notes'), {
-                        content: finalContent || (selectedImage ? "" : targetDate),
+                        content: finalContent || "",
                         createdAt: serverTimestamp(),
                         imageUrl: selectedImage,
                         targetDate: targetDate
@@ -353,7 +383,6 @@
 
             return (
                 <div className="flex flex-col md:flex-row min-h-screen">
-                    {/* 窄化側邊欄: w-60 -> w-48 */}
                     <aside className="hidden md:flex w-48 wood-texture bg-[#432818] text-[#f5ebe0] flex-col p-4 fixed h-full shadow-2xl z-20">
                         <div className="mb-8">
                             <h1 className="text-lg font-black flex items-center gap-2">
@@ -380,9 +409,7 @@
                         </div>
                     </aside>
 
-                    {/* 主內容區對應調整: ml-60 -> ml-48 */}
                     <main className="flex-1 md:ml-48 bg-[#f5ebe0] pb-10">
-                        {/* 頂部 Header & 輸入區 */}
                         <div className="bg-white/40 backdrop-blur-sm border-b border-[#e3d5ca] px-4 py-4 md:px-8 md:py-4 mb-4">
                             <header className="md:hidden flex items-center justify-between mb-4">
                                 <h1 className="text-lg font-black text-[#432818] flex items-center gap-2">
@@ -425,7 +452,6 @@
                             </div>
                         </div>
 
-                        {/* 筆記列表區 */}
                         <div className="px-4 md:px-8 lg:px-10">
                             <section className="max-w-4xl mx-auto">
                                 {loading ? (
@@ -470,13 +496,14 @@
             const [editValue, setEditValue] = useState('');
             const editRef = useRef(null);
 
-            const hasContent = note.content && note.content.trim() !== "";
+            const hasContent = note.content !== undefined && note.content !== null && note.content.toString().trim() !== "";
             const hasImage = !!note.imageUrl;
             const hasDate = !!note.targetDate;
 
             const getInitialEditValue = () => {
-                if (!note.targetDate) return note.content;
-                return `${note.targetDate} ${note.content}`.trim();
+                const date = note.targetDate || "";
+                const content = note.content || "";
+                return `${date} ${content}`.trim();
             };
 
             const rowGroup = Math.floor(index / 2);
@@ -484,9 +511,7 @@
             const bgClass = isEvenGroup ? 'bg-[#f7f9f2] border-[#e9efe0]' : 'bg-[#fffdf0] border-[#f5f5e6]';
 
             useEffect(() => {
-                if (isEditing) {
-                    setEditValue(getInitialEditValue());
-                }
+                if (isEditing) setEditValue(getInitialEditValue());
             }, [isEditing]);
 
             useEffect(() => {
@@ -495,7 +520,7 @@
                     editRef.current.style.height = 'auto';
                     editRef.current.style.height = editRef.current.scrollHeight + 'px';
                 }
-            }, [isEditing]);
+            }, [isEditing, editValue]);
 
             const handleUpdate = async () => {
                 const initial = getInitialEditValue();
@@ -507,17 +532,17 @@
                 const newContent = newTargetDate ? editValue.replace(newTargetDate, '').trim() : editValue;
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id), {
-                        content: newContent,
-                        targetDate: newTargetDate
+                        content: newContent || "",
+                        targetDate: newTargetDate || null
                     });
                     setIsEditing(false);
                 } catch (err) { setIsEditing(false); }
             };
 
             return (
-                <article className={`note-card rounded-2xl p-3 md:p-3 card-shadow relative animate-fade-in group border ${bgClass} ${isEditing ? 'ring-2 ring-[#99582a]/20' : ''}`}>
+                <article className={`note-card rounded-2xl p-3 card-shadow relative animate-fade-in group border ${bgClass} ${isEditing ? 'ring-2 ring-[#99582a]/20' : ''}`}>
                     {!isEditing && (
-                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id))}
+                        <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'notes', note.id)); }}
                                 className="absolute top-1 right-1 text-[#d5bdaf] hover:text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all p-1 hover:bg-white rounded-full z-10">
                             <Icon name="trash" size={13} />
                         </button>
@@ -533,38 +558,36 @@
                     )}
 
                     {hasImage && (
-                        <div className={`relative cursor-zoom-in overflow-hidden rounded shadow-sm bg-black/5 ${hasContent ? 'mb-1.5' : ''}`} onClick={() => fullscreenImage(note.imageUrl)}>
+                        <div className={`relative cursor-zoom-in overflow-hidden rounded shadow-sm bg-black/5 ${hasContent || isEditing ? 'mb-1.5' : ''}`} onClick={() => fullscreenImage(note.imageUrl)}>
                             <img src={note.imageUrl} className="w-full h-auto max-h-[400px] object-cover" />
                         </div>
                     )}
 
-                    {(hasContent || isEditing) && (
-                        <div className="relative">
-                            {isEditing ? (
-                                <div className="flex flex-col gap-1">
-                                    <textarea
-                                        ref={editRef}
-                                        value={editValue}
-                                        onChange={(e) => {
-                                            setEditValue(e.target.value);
-                                            e.target.style.height = 'auto';
-                                            e.target.style.height = e.target.scrollHeight + 'px';
-                                        }}
-                                        onBlur={handleUpdate}
-                                        className="w-full bg-white/50 border-none p-0 text-[16px] font-medium text-[#432818] focus:outline-none resize-none overflow-hidden rounded"
-                                    />
-                                    <div className="text-[9px] text-[#99582a]/40 font-bold self-end flex items-center gap-1"><Icon name="check" size={9} /> 點擊空白處儲存</div>
-                                </div>
-                            ) : (
-                                <div 
-                                    onClick={() => setIsEditing(true)}
-                                    className="text-[#432818] text-[16px] font-medium leading-relaxed whitespace-pre-wrap break-words cursor-text hover:bg-[#99582a]/5 rounded transition-colors"
-                                >
-                                    {renderContent(note.content)}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <div className="relative w-full">
+                        {isEditing ? (
+                            <div className="flex flex-col gap-1">
+                                <textarea
+                                    ref={editRef}
+                                    value={editValue}
+                                    onChange={(e) => {
+                                        setEditValue(e.target.value);
+                                        e.target.style.height = 'auto';
+                                        e.target.style.height = e.target.scrollHeight + 'px';
+                                    }}
+                                    onBlur={handleUpdate}
+                                    className="w-full bg-white/50 border-none p-0 text-[16px] font-medium text-[#432818] focus:outline-none resize-none overflow-hidden rounded"
+                                />
+                                <div className="text-[9px] text-[#99582a]/40 font-bold self-end flex items-center gap-1"><Icon name="check" size={9} /> 點擊空白處儲存</div>
+                            </div>
+                        ) : (
+                            <div 
+                                onClick={() => setIsEditing(true)}
+                                className="text-[#432818] text-[16px] font-medium leading-relaxed whitespace-pre-wrap break-words cursor-text hover:bg-[#99582a]/5 rounded transition-colors min-h-[1.5em]"
+                            >
+                                {renderContent(note.content) || (hasDate ? "" : "（無文字內容）")}
+                            </div>
+                        )}
+                    </div>
                 </article>
             );
         }
